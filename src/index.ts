@@ -30,27 +30,29 @@ function createServer(): McpServer {
     version: '1.0.0',
   });
 
-  server.tool(
+  server.registerTool(
     'search_sumologic',
-    SEARCH_TOOL_DESCRIPTION,
     {
-      query: z.string().describe('Sumo Logic search query'),
-      from: z.string().optional().describe('ISO 8601 start time (defaults to 24 hours ago)'),
-      to: z.string().optional().describe('ISO 8601 end time (defaults to now)'),
-      limit: z
-        .number()
-        .int()
-        .min(1)
-        .max(10_000)
-        .optional()
-        .describe('Max results to return (default 100)'),
-      offset: z.number().int().min(0).optional().describe('Pagination offset (default 0)'),
-      resultType: z
-        .enum(['messages', 'records', 'both'])
-        .optional()
-        .describe(
-          'Result format: messages for raw logs, records for aggregates, both for mixed queries',
-        ),
+      description: SEARCH_TOOL_DESCRIPTION,
+      inputSchema: {
+        query: z.string().describe('Sumo Logic search query'),
+        from: z.string().optional().describe('ISO 8601 start time (defaults to 24 hours ago)'),
+        to: z.string().optional().describe('ISO 8601 end time (defaults to now)'),
+        limit: z
+          .number()
+          .int()
+          .min(1)
+          .max(10_000)
+          .optional()
+          .describe('Max results to return (default 100)'),
+        offset: z.number().int().min(0).optional().describe('Pagination offset (default 0)'),
+        resultType: z
+          .enum(['messages', 'records', 'both'])
+          .optional()
+          .describe(
+            'Result format: messages for raw logs, records for aggregates, both for mixed queries',
+          ),
+      },
     },
     async ({ query, from, to, limit, offset, resultType }) => {
       try {
