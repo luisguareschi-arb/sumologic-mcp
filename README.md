@@ -30,10 +30,56 @@ cp .env.example .env
 | US2        | `https://api.us2.sumologic.com/api/v1` |
 | EU         | `https://api.eu.sumologic.com/api/v1`  |
 
-4. Build and start:
+4. Build:
 
 ```bash
 npm run build
+```
+
+### Option A: Cursor launches the server automatically (recommended)
+
+Cursor can spawn the MCP process for you over stdio — no need to run `npm start` manually.
+
+Add this to your Cursor MCP config (`~/.cursor/mcp.json`):
+
+```json
+{
+  "mcpServers": {
+    "sumologic": {
+      "command": "node",
+      "args": ["/absolute/path/to/sumologic-mcp/dist/index.js", "--stdio"],
+      "env": {
+        "ENDPOINT": "https://api.sumologic.com/api/v1",
+        "SUMO_API_ID": "your-access-id",
+        "SUMO_API_KEY": "your-access-key"
+      }
+    }
+  }
+}
+```
+
+Replace `/absolute/path/to/sumologic-mcp` with the real path to this repo. Credentials can also live in the project's `.env` file (loaded automatically from the project root).
+
+For development without building, use `npx tsx`:
+
+```json
+{
+  "mcpServers": {
+    "sumologic": {
+      "command": "npx",
+      "args": ["tsx", "/absolute/path/to/sumologic-mcp/src/index.ts", "--stdio"]
+    }
+  }
+}
+```
+
+Restart or reload MCP servers in Cursor after changing the config.
+
+### Option B: HTTP server (for remote hosting)
+
+Start the server manually:
+
+```bash
 npm start
 ```
 
@@ -45,9 +91,7 @@ npm run dev
 
 The server listens on `http://localhost:3006` by default.
 
-## Cursor MCP configuration
-
-Add this to your Cursor MCP config (`~/.cursor/mcp.json`):
+Add this to your Cursor MCP config:
 
 ```json
 {

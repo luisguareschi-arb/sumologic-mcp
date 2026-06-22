@@ -1,6 +1,9 @@
 import { config } from 'dotenv';
 import { randomUUID } from 'node:crypto';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import express from 'express';
@@ -10,7 +13,8 @@ import { createClient } from './sumologic/client.js';
 import { search } from './sumologic/search.js';
 import { safeStringify } from './utils/json.js';
 
-config();
+const projectRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
+config({ path: join(projectRoot, '.env') });
 
 const appConfig = loadConfig();
 const sumoClient = createClient({
@@ -92,7 +96,13 @@ function createServer(): McpServer {
   return server;
 }
 
-async function runServer(): Promise<void> {
+async function runStdio(): Promise<void> {
+  const server = createServer();
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+}
+
+async function runHttpServer(): Promise<void> {
   const app = express();
   app.use(express.json());
 
@@ -183,7 +193,9 @@ async function runServer(): Promise<void> {
   });
 }
 
-runServer().catch((error) => {
+const useStdio = process.argv.includes('--stdio');
+
+(useStdio ? runStdio() : runHttpServer()).catch((error) => {
   console.error('Failed to start Sumo Logic MCP server:', error);
   process.exit(1);
 });
