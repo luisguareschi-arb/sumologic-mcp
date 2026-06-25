@@ -75,7 +75,7 @@ For development without building, use `npx tsx`:
 
 Restart or reload MCP servers in Cursor after changing the config.
 
-### Option B: HTTP server (for remote hosting)
+### Option B: HTTP server (local development)
 
 Start the server manually:
 
@@ -89,6 +89,12 @@ For development with auto-reload:
 npm run dev
 ```
 
+HTTP mode requires `MCP_API_KEY` in your `.env`. Generate one with:
+
+```bash
+openssl rand -hex 32
+```
+
 The server listens on `http://localhost:3006` by default.
 
 Add this to your Cursor MCP config:
@@ -97,13 +103,102 @@ Add this to your Cursor MCP config:
 {
   "mcpServers": {
     "sumologic": {
-      "url": "http://localhost:3006/mcp"
+      "url": "http://localhost:3006/mcp",
+      "headers": {
+        "Authorization": "Bearer ${env:SUMOLOGIC_MCP_API_KEY}"
+      }
     }
   }
 }
 ```
 
+Set `SUMOLOGIC_MCP_API_KEY` in your shell to match `MCP_API_KEY` in `.env`.
+
 Restart the MCP server in Cursor after starting the local server.
+
+### Option C: Docker (public cloud hosting)
+
+Run the MCP server on a cloud VM with TLS and API key authentication. Caddy terminates HTTPS and proxies to the app container; port 3006 is not exposed to the host.
+
+#### Prerequisites
+
+- A domain name (e.g. `mcp.yourcompany.com`) with an A record pointing to your VM's public IP
+- Firewall rules allowing inbound traffic on ports 80 and 443 only
+- Docker and Docker Compose installed on the VM
+
+#### Setup
+
+1. Copy and configure environment variables on the VM:
+
+```bash
+cp .env.example .env
+```
+
+Set these values in `.env`:
+
+| Variable | Description |
+| -------- | ----------- |
+| `ENDPOINT` | Sumo Logic API base URL |
+| `SUMO_API_ID` | Sumo Logic access ID |
+| `SUMO_API_KEY` | Sumo Logic access key |
+| `MCP_API_KEY` | Shared Bearer token for MCP clients (`openssl rand -hex 32`) |
+| `MCP_DOMAIN` | Public hostname (e.g. `mcp.yourcompany.com`) |
+
+2. Start the stack:
+
+```bash
+docker compose up -d
+```
+
+Caddy obtains a Let's Encrypt certificate automatically for `MCP_DOMAIN`.
+
+#### Verify deployment
+
+Health check (no auth required):
+
+```bash
+curl https://mcp.yourcompany.com/health
+```
+
+MCP endpoint rejects unauthenticated requests:
+
+```bash
+curl -s -o /dev/null -w "%{http_code}" -X POST https://mcp.yourcompany.com/mcp
+# Expected: 401
+```
+
+Authenticated request:
+
+```bash
+curl -X POST https://mcp.yourcompany.com/mcp \
+  -H "Authorization: Bearer $MCP_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0.0"}},"id":1}'
+```
+
+#### Cursor client config (remote)
+
+```json
+{
+  "mcpServers": {
+    "sumologic": {
+      "url": "https://mcp.yourcompany.com/mcp",
+      "headers": {
+        "Authorization": "Bearer ${env:SUMOLOGIC_MCP_API_KEY}"
+      }
+    }
+  }
+}
+```
+
+Set `SUMOLOGIC_MCP_API_KEY` in your local shell to match `MCP_API_KEY` on the server.
+
+#### Security notes
+
+- Never commit `.env` or expose `MCP_API_KEY` in client configs — use `${env:...}` interpolation
+- Rotate `MCP_API_KEY` if it is leaked; all clients must update their env var
+- Restrict the VM security group to known IP ranges if your team has fixed egress
+- Sumo credentials stay server-side; clients only need the MCP Bearer token
 
 ## Available tools
 
@@ -135,6 +230,8 @@ Use `resultType: "messages"` for raw log lines, `records` for aggregate/tabular 
 | `ENDPOINT`          | yes      | —        | Sumo Logic API base URL                     |
 | `SUMO_API_ID`       | yes      | —        | Access ID                                   |
 | `SUMO_API_KEY`      | yes      | —        | Access key                                  |
+| `MCP_API_KEY`       | HTTP only | —       | Bearer token for `/mcp` requests            |
+| `MCP_DOMAIN`        | Docker   | —        | Public hostname for Caddy TLS               |
 | `PORT`              | no       | `3006`   | HTTP server port                            |
 | `TIMEZONE`          | no       | `UTC`    | Timezone for search jobs                    |
 | `SEARCH_TIMEOUT_MS` | no       | `300000` | Max wait time for search completion (5 min) |

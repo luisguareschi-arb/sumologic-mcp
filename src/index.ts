@@ -9,6 +9,7 @@ import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import express from 'express';
 import { z } from 'zod';
 import { loadConfig } from './config.js';
+import { createBearerAuthMiddleware } from './middleware/auth.js';
 import { createClient } from './sumologic/client.js';
 import { search } from './sumologic/search.js';
 import { safeStringify } from './utils/json.js';
@@ -103,9 +104,16 @@ async function runStdio(): Promise<void> {
 }
 
 async function runHttpServer(): Promise<void> {
+  if (!appConfig.MCP_API_KEY) {
+    throw new Error(
+      'MCP_API_KEY is required when running in HTTP mode. Generate one with: openssl rand -hex 32',
+    );
+  }
+
   const app = express();
   app.use(express.json());
 
+  const bearerAuth = createBearerAuthMiddleware(appConfig.MCP_API_KEY);
   const transports: Record<string, StreamableHTTPServerTransport> = {};
 
   app.get('/health', (_req, res) => {
@@ -117,7 +125,7 @@ async function runHttpServer(): Promise<void> {
     });
   });
 
-  app.post('/mcp', async (req, res) => {
+  app.post('/mcp', bearerAuth, async (req, res) => {
     try {
       const sessionId = req.headers['mcp-session-id'] as string | undefined;
       let transport: StreamableHTTPServerTransport;
@@ -181,8 +189,8 @@ async function runHttpServer(): Promise<void> {
     await transport.handleRequest(req, res);
   };
 
-  app.get('/mcp', handleSessionRequest);
-  app.delete('/mcp', handleSessionRequest);
+  app.get('/mcp', bearerAuth, handleSessionRequest);
+  app.delete('/mcp', bearerAuth, handleSessionRequest);
 
   const port = appConfig.PORT;
 
