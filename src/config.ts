@@ -7,6 +7,7 @@ const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(3006),
   TIMEZONE: z.string().default('UTC'),
   SEARCH_TIMEOUT_MS: z.coerce.number().int().positive().default(300_000),
+  MCP_API_KEY: z.string().min(1).optional(),
   NODE_ENV: z.string().optional(),
 });
 
